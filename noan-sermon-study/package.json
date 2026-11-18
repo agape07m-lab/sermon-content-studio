@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "name": "noan-sermon-study",
+  "version": "2.1.0",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

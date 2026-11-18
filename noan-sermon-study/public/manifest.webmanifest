@@ -1,0 +1,15 @@
+{
+  "name": "노안 설교연구실",
+  "short_name": "설교연구실",
+  "description": "노안중앙교회 목회자의 설교 연구와 원고 보관",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F5F0E8",
+  "theme_color": "#795B46",
+  "icons": [
+    {"src":"/icon-192.png","type":"image/png","sizes":"192x192","purpose":"any"},
+    {"src":"/icon-512.png","type":"image/png","sizes":"512x512","purpose":"any maskable"}
+  ]
+}
