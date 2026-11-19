@@ -30,5 +30,17 @@
     "PUBLIC_ORIGIN": "https://black-feather-52eb.noan-central-3354fde.workers.dev",
     "PLUS_HOSTED_APPROVED": "false",
     "PLUS_INCLUDED_ONLY_VERIFIED": "false"
+  },
+  "previews": {
+    "vars": {
+      "PUBLIC_ORIGIN": "https://black-feather-52eb.noan-central-3354fde.workers.dev",
+      "PLUS_HOSTED_APPROVED": "false",
+      "PLUS_INCLUDED_ONLY_VERIFIED": "false"
+    },
+    "durable_objects": {
+      "bindings": [
+        { "name": "PLUS_SESSIONS", "class_name": "PlusSessions" }
+      ]
+    }
   }
 }

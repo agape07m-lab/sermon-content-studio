@@ -16,6 +16,7 @@ test('공식 등록·암호화 준비 전 연결과 과금 요청을 차단한�
   assert.throws(()=>requirePlanConfig({...env(),PLUS_INCLUDED_ONLY_VERIFIED:'false'}),{code:'credit_policy_unverified'});
   const app=new PlusSessions({storage:storage()},{});const r=await app.fetch(new Request(origin+'/api/gpt/status'));assert.equal(r.status,503);assert.equal((await r.json()).error,'registration_pending');
   const out=await worker.fetch(new Request(origin+'/api/gpt/run'),{ASSETS:{fetch(){throw Error('API must not become HTML');}}});assert.equal(out.status,503);
+  const noSession=await worker.fetch(new Request(origin+'/api/gpt/status'),{...env(),PLUS_INCLUDED_ONLY_VERIFIED:'false',PLUS_SESSIONS:{get(){throw Error('Disabled connection must not instantiate a session object');}}});assert.equal(noSession.status,503);assert.equal((await noSession.json()).error,'credit_policy_unverified');
 });
 test('세션과 갱신 자격은 암호화하며 변조된 보관본은 해독하지 못한다',async()=>{
   const value={access_token:'fixture-only',refresh_token:'fixture-refresh'};const box=await seal(value,env().PLUS_STORAGE_KEY);assert.ok(!JSON.stringify(box).includes('fixture'));assert.deepEqual(await unseal(box,env().PLUS_STORAGE_KEY),value);await assert.rejects(()=>unseal(box,'22'.repeat(32)));

@@ -6,6 +6,8 @@ const cookie=(name,value,age)=>`${name}=${value}; Path=/; Secure; HttpOnly; Same
 const cookieValue=(request,name)=>{const value=request.headers.get('Cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1)||'';return /^[\w-]{43}$/.test(value)?value:'';};
 const notice=(message,status=400)=>new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ChatGPT 연결</title><p>${message}</p><p><a href="/">설교연구실로 돌아가기</a></p></html>`,{status,headers:{...HEADERS,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'"}});
 export default {async fetch(request,env){const path=new URL(request.url).pathname;if(path.startsWith('/api/gpt/')||path.startsWith('/auth/openai/')){
+  // Disabled deployments never instantiate a session object or contact OpenAI.
+  try{requirePlanConfig(env);}catch(e){return json({error:e instanceof PlanError?e.code:'connection_unavailable',message:e instanceof PlanError?e.message:'GPT 연결 준비 중입니다.'},503);}
   if(!env.PLUS_SESSIONS)return json({error:'registration_pending',message:'Plus 연결 준비 중입니다. 기존 원고는 계속 작성하고 보관할 수 있습니다.'},503);
   return env.PLUS_SESSIONS.get(env.PLUS_SESSIONS.idFromName('plus-sessions-v1')).fetch(request);
 }return env.ASSETS.fetch(request);}};
