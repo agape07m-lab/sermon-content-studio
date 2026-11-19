@@ -45,3 +45,14 @@
 .completed-record{padding:14px 0;border-bottom:1px solid var(--line)}
 .completed-record h4{margin:5px 0}.record-label{font-size:12px;font-weight:700;color:var(--brown)}
 .inbox-group{padding:12px 0 22px}.inbox-group h3{margin:8px 0}.inbox-group .actions{margin-top:12px}
+
+.plus-header{display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap}
+#plusPanel [hidden],#plusResultDialog[hidden]{display:none!important}
+.plus-badge{background:#eaf2ec;color:#276b51;padding:5px 9px;border-radius:8px;font-size:14px}
+.plus-connection{padding:16px;background:#f8f4ed;border:1px solid var(--line);border-radius:12px;margin:16px 0}
+.plus-connection p,.plus-panel .help,#plusStatus{font-size:14px}.plus-connection strong{display:block}.plus-connection span{font-size:14px;overflow-wrap:anywhere}
+.plus-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.plus-actions .btn{min-height:44px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.plus-panel .field textarea,.plus-panel .field select{font-size:16px}.plus-stages{margin-top:18px}.plus-review{white-space:pre-wrap;font-size:16px;line-height:1.85;margin-top:12px;overflow-wrap:anywhere}
+.plus-panel details{padding:14px 0;border-top:1px solid var(--line)}.plus-panel summary{cursor:pointer;font-weight:700}
+#plusResultText{min-height:55vh;font-size:16px;line-height:1.85}#plusResultDialog .dialog{max-width:900px}
+@media(max-width:600px){.plus-stages .btn{flex:1 1 45%}.plus-actions{gap:8px}.plus-connection{padding:13px}.plus-header h3{font-size:19px}}

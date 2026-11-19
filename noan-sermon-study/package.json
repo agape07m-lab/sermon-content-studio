@@ -1,10 +1,10 @@
 {
   "private": true,
   "name": "noan-sermon-study",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "scripts": {
     "deploy": "wrangler deploy",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test --test-isolation=none tests/*.test.cjs tests/*.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

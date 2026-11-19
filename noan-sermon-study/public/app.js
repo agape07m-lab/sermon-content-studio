@@ -1,7 +1,7 @@
 'use strict';
 /** Additional offline-first PWA interface. The existing sermon schema and editors are preserved. */
 (() => {
-  const APP_VERSION = '2.2.0-two-completed';
+  const APP_VERSION = '2.3.0-plus-workflow';
   const INBOX_KEY = 'noan_sermon_private_inbox_v2';
   const REMOTE_CACHE_KEY = 'noan_sermon_remote_read_cache_v1';
   // This is a public read-only feed. Do not publish confidential pastoral notes here.
@@ -176,7 +176,7 @@
     el('#extraFile').value='';
   }
   function exportAll(){
-    const payload={format:'noan-sermon-studio',version:3,exportedAt:new Date().toISOString(),projects:state.projects,inbox,remoteFeed:{schema:1,updatedAt:feedUpdatedAt,items:Object.values(remote).flat()}};
+    const payload={format:'noan-sermon-studio',version:3,exportedAt:new Date().toISOString(),projects:state.projects,inbox,plusWork:window.NoanPlusWork?.export()||{},remoteFeed:{schema:1,updatedAt:feedUpdatedAt,items:Object.values(remote).flat()}};
     download('노안설교연구실_독립앱_전체백업_'+localToday()+'.json',JSON.stringify(payload,null,2),'application/json;charset=utf-8');
     toast('설교 카드와 예약 원고함을 함께 백업했습니다.');
   }
@@ -196,6 +196,7 @@
       for(const [id,obj] of Object.entries(extra)){
         if(tasks.some(t=>t.id===id)&&obj&&typeof obj.content==='string'&&obj.content.length<=600000)inbox[id]={content:obj.content,title:String(obj.title||''),passage:String(obj.passage||''),savedAt:String(obj.savedAt||new Date().toISOString())};
       }
+      if(data.plusWork)window.NoanPlusWork?.merge(data.plusWork);
       saveInbox();persist();render();renderHome();renderInbox();
       toast(`설교 ${cards.length}편을 가져왔습니다.`);go('archive');
     }catch(e){toast('가져오기 실패: '+(e.message||'파일 오류'));}
