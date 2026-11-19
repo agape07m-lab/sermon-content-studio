@@ -40,3 +40,8 @@
 .feed-status{font-size:12px;color:#796f66}
 @media(max-width:600px){.reader-dialog{padding:16px 14px 12px;max-height:96vh}.reader-body{font-size:15px;padding:8px 2px 22px}.reader-dialog #readerTitle{font-size:19px}}
 #readerDialog[hidden]{display:none!important}
+
+
+.completed-record{padding:14px 0;border-bottom:1px solid var(--line)}
+.completed-record h4{margin:5px 0}.record-label{font-size:12px;font-weight:700;color:var(--brown)}
+.inbox-group{padding:12px 0 22px}.inbox-group h3{margin:8px 0}.inbox-group .actions{margin-top:12px}

@@ -1,17 +1,20 @@
 'use strict';
 /** Additional offline-first PWA interface. The existing sermon schema and editors are preserved. */
 (() => {
-  const APP_VERSION = '2.1.0-read-in-app';
+  const APP_VERSION = '2.2.0-two-completed';
   const INBOX_KEY = 'noan_sermon_private_inbox_v2';
   const REMOTE_CACHE_KEY = 'noan_sermon_remote_read_cache_v1';
   // This is a public read-only feed. Do not publish confidential pastoral notes here.
   const FEED_URL = 'https://raw.githubusercontent.com/agape07m-lab/sermon-content-studio/main/noan-sermon-study/latest.json';
   let remote = {};
+  let refreshInFlight=false;
+  let lastCheckedAt='';
   let feedUpdatedAt = '';
   let feedError = '';
   const tasks = [
     {id:'dawn', name:'새벽예배', label:'다음 새벽예배 설교', kind:'dawn', schedule:'월–토 오전 6:30', latest:'메마른 땅에서 하나님을 찾다', passage:'시편 63:1–11', original:'2026-11-19'},
     {id:'wednesday', name:'수요기도회', label:'다음 수요기도회 설교·예배 준비', kind:'wednesday', schedule:'토요일 오전 6:30', latest:'누군가의 믿음이 길이 될 때', passage:'마가복음 2:1–12', original:'2026-11-18'},
+    {id:'sunday', name:'주일예배', label:'주일예배 설교', kind:'sunday', schedule:'대화에서 완성한 원고', latest:'주일예배 설교', passage:'', original:''},
     {id:'overview', name:'성경개관', label:'주일 오후예배 성경개관 준비', kind:'overview', schedule:'금요일 오전 8:00', latest:'19주차 마가복음', passage:'마가복음', original:'2026-11-15'}
   ];
   let inbox = {};
@@ -23,33 +26,37 @@
   const shorten = (s,n=70) => s && s.length>n ? s.slice(0,n)+'…' : (s||'');
   const getTask = id => tasks.find(t=>t.id===id)||tasks[0];
   const getLocalResult = id => inbox[id]&&typeof inbox[id].content==='string'&&inbox[id].content.trim()?inbox[id]:null;
-  const getRemoteResult = id => remote[id]&&typeof remote[id].content==='string'&&remote[id].content.trim()?remote[id]:null;
+  const getRemoteResults = kind => remote[kind]||[];
+  const getRemoteResult = id => Object.values(remote).flat().find(o=>o.id===id)||getRemoteResults(id)[0]||null;
   function parseRemote(raw){
-    if(!raw||raw.schema!==1||!Array.isArray(raw.items))throw new Error('원고 목록 형식이 올바르지 않습니다.');
-    const items={};
-    for(const o of raw.items){
-      if(!o||!tasks.some(t=>t.id===o.id)||typeof o.content!=='string'||o.content.length>100000||!o.content.trim())continue;
-      items[o.id]={...o,title:String(o.title||'원고'),content:o.content};
-    }
-    return {items,updatedAt:String(raw.updatedAt||'')};
+    const result=NoanFeed.parse(raw);
+    return {items:result.groups,updatedAt:result.updatedAt};
   }
   function loadRemoteCache(){
     try{const r=parseRemote(JSON.parse(localStorage.getItem(REMOTE_CACHE_KEY)||'null'));remote=r.items;feedUpdatedAt=r.updatedAt;}
     catch{remote={};}
   }
+  function renderFeedStatus(){
+    const status=el('#feedStatus');if(!status)return;
+    status.textContent=feedError?'새 원고 확인 실패 · 저장된 사본 표시 · '+feedError:lastCheckedAt?'최근 확인: '+when(lastCheckedAt)+' · 목록 갱신: '+when(feedUpdatedAt):feedUpdatedAt?'저장된 사본 · 목록 갱신: '+when(feedUpdatedAt):'원고 목록을 아직 받지 못했습니다.';
+  }
   async function refreshRemoteFeed(showMessage=false){
-    if(!navigator.onLine){if(showMessage)toast('오프라인입니다. 저장된 원고를 확인해 주세요.');return;}
+    if(refreshInFlight)return;
+    if(!navigator.onLine){feedError='인터넷 연결 없음';renderFeedStatus();if(showMessage)toast('오프라인입니다. 저장된 원고를 확인해 주세요.');return;}
+    refreshInFlight=true;
     const status=el('#feedStatus');if(status)status.textContent='최신 원고 확인 중…';
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
     try{
-      const response=await fetch(FEED_URL+'?v='+Date.now(),{cache:'no-store',mode:'cors'});
+      const response=await fetch(FEED_URL+'?v='+Date.now(),{cache:'no-store',mode:'cors',signal:controller.signal});
       if(!response.ok)throw new Error('원고 자료에 접근할 수 없습니다.');
       const raw=await response.json();const parsed=parseRemote(raw);
-      remote=parsed.items;feedUpdatedAt=parsed.updatedAt;feedError='';
+      if(!raw.items.length&&Object.values(remote).flat().length)throw new Error('빈 목록 수신 · 기존 원고 유지');
+      remote=parsed.items;feedUpdatedAt=parsed.updatedAt;feedError='';lastCheckedAt=new Date().toISOString();
       try{localStorage.setItem(REMOTE_CACHE_KEY,JSON.stringify(raw));}catch{}
       renderHome();renderInbox();
       if(showMessage)toast('원고 목록을 확인했습니다.');
-    }catch(err){feedError=err?.message||'네트워크 확인 실패';if(showMessage)toast('새 원고를 불러오지 못했습니다. 저장된 사본을 표시합니다.');}
-    finally{if(status)status.textContent=feedUpdatedAt?'원고 목록 최근 확인: '+when(feedUpdatedAt)+(feedError?' · 오프라인 사본':''):'원고 목록을 아직 받지 못했습니다.';}
+    }catch(err){feedError=err?.name==='AbortError'?'응답 시간 초과':err?.message||'네트워크 확인 실패';if(showMessage)toast('새 원고를 불러오지 못했습니다. 저장된 사본을 표시합니다.');}
+    finally{clearTimeout(timer);refreshInFlight=false;renderFeedStatus();}
   }
   function toReaderHTML(content){
     const inline=s=>escapeHTML(s).replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
@@ -64,12 +71,13 @@
     }).join('');
   }
   let readingTaskId='dawn';
+  let readingRecord=null;
   function openReader(id){
     const r=getRemoteResult(id);
     if(!r){openSaved(id);return;}
-    readingTaskId=id;
+    readingTaskId=r.kind;readingRecord={...r};
     el('#readerTitle').textContent=r.title;
-    el('#readerMeta').textContent=(r.passage||getTask(id).passage)+' · '+(r.date||'')+' · '+(r.origin||'예약 실행 원고');
+    el('#readerMeta').textContent=getTask(r.kind).name+' · '+(r.passage||'')+' · '+recordDate(r)+' · '+(r.origin||'완료 원고');
     el('#readerContent').innerHTML=toReaderHTML(r.content);
     el('#readerDialog').hidden=false;
     el('#readerDialog .reader-body').scrollTop=0;
@@ -77,11 +85,11 @@
   }
   function closeReader(){el('#readerDialog').hidden=true;}
   function saveRemoteToCard(){
-    const r=getRemoteResult(readingTaskId);if(!r)return;
+    const r=readingRecord;if(!r)return;
     currentTaskId=readingTaskId;
     el('#extraText').value=r.content;
     closeReader();
-    saveImported();
+    saveImported(r);
   }
   const when = iso => iso? new Date(iso).toLocaleString('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   function loadInbox(){
@@ -92,13 +100,14 @@
     try{localStorage.setItem(INBOX_KEY,JSON.stringify(inbox));}
     catch{toast('기기 저장 공간이 부족합니다. 원고를 복사하여 보관하세요.');}
   }
+  const recordDate = r => r.date|| (r.sequence?r.sequence+'주차 · 예배일 미확인':'예배일 미확인');
+  function remoteCard(r,index){
+    return `<div class="completed-record"><span class="record-label">${index===0?'최근 완료본':'직전 완료본'}</span><h4>${escapeHTML(r.title)}</h4><p class="sub">${escapeHTML(recordDate(r))} · ${escapeHTML(r.passage)}</p><button type="button" class="${index===0?'solid':'soft'}-button" data-read-remote="${escapeHTML(r.id)}">${index===0?'최근 원고 읽기':'직전 원고 읽기'}</button></div>`;
+  }
   function renderHome(){
     el('#homeSchedules').innerHTML=tasks.map(t=>{
-      const saved=getLocalResult(t.id),published=getRemoteResult(t.id);
-      const title=published?.title||saved?.title||t.latest;
-      const passage=published?.passage||saved?.passage||t.passage;
-      const availability=published?'원고 전문을 앱에서 읽을 수 있습니다.':saved?'기기에 저장한 원고':'아직 연결된 원고 없음';
-      return `<article class="sched-card"><span class="pill">${escapeHTML(t.name)}</span><h4>${escapeHTML(title)}</h4><p class="sub">${escapeHTML(passage)}<br>${escapeHTML(t.schedule)}</p><div class="line">${escapeHTML(availability)}</div><div class="actions">${published?`<button type="button" class="solid-button" data-read-remote="${escapeHTML(t.id)}">원고 바로 읽기</button>`:`<button type="button" class="solid-button" data-open-inbox="${escapeHTML(t.id)}">${saved?'저장된 원고 보기':'원고 가져오기'}</button>`}<button type="button" class="soft-button" data-import="${escapeHTML(t.id)}">원고 붙여넣기</button></div></article>`;
+      const records=getRemoteResults(t.kind),saved=getLocalResult(t.id);
+      return `<article class="sched-card"><span class="pill">${escapeHTML(t.name)}</span><p class="sub">${escapeHTML(t.schedule)}</p>${records.map(remoteCard).join('')||'<p>연결된 완료 원고가 없습니다.</p>'}${t.kind!=='dawn'&&records.length===1?'<p class="sub">직전 완료본은 아직 확인되지 않았습니다.</p>':''}<div class="actions">${saved?`<button type="button" class="soft-button" data-open-inbox="${t.id}">기기 저장본</button>`:''}<button type="button" class="soft-button" data-import="${t.id}">원고 붙여넣기</button></div></article>`;
     }).join('');
     const p=active();
     el('#homeRecent').innerHTML=p?`<button type="button" class="note-card" id="openRecent"><div><span class="pill">${escapeHTML(MODES[p.kind]?.name||'설교')}</span><h4>${escapeHTML(p.title||'제목 없는 설교')}</h4><p>${escapeHTML(p.passage||'본문 미정')} · ${escapeHTML(p.date||'')}</p></div><span style="font-size:25px;color:#ac957d">›</span></button>`:
@@ -106,11 +115,10 @@
   }
   function renderInbox(){
     el('#inboxRows').innerHTML=tasks.map(t=>{
-      const saved=getLocalResult(t.id),published=getRemoteResult(t.id);
-      const title=published?.title||saved?.title||t.latest;
-      let info=published?'읽기 가능 · '+(published.date||'예배일 미정')+' · '+(published.origin||'원고 전문'):(saved?'보관: '+when(saved.savedAt):'아직 가져온 원고 없음 · '+t.passage);
-      return `<article class="inbox-row"><div><span style="font-size:11px;color:var(--brown);font-weight:750">${escapeHTML(t.name)} · ${escapeHTML(t.schedule)}</span><h4>${escapeHTML(title)}</h4><p class="sub">${escapeHTML(info)}</p></div><div class="row-actions">${published?`<button class="solid-button" data-read-remote="${escapeHTML(t.id)}">원고 전문 읽기</button>`:`<button class="solid-button" data-open-inbox="${escapeHTML(t.id)}">${saved?'내 원고 읽기':'원고 가져오기'}</button>`}${saved&&published?`<button class="soft-button" data-open-inbox="${escapeHTML(t.id)}">기기 저장본</button>`:''}<button class="soft-button" data-import="${escapeHTML(t.id)}">직접 가져오기</button></div></article>`;
+      const records=getRemoteResults(t.kind),saved=getLocalResult(t.id);
+      return `<section class="inbox-group"><h3>${escapeHTML(t.name)}</h3>${records.map((r,i)=>`<article class="inbox-row"><div><span class="record-label">${i===0?'최근 완료본':'직전 완료본'}</span><h4>${escapeHTML(r.title)}</h4><p class="sub">${escapeHTML(recordDate(r))} · ${escapeHTML(r.passage)}</p></div><button type="button" class="solid-button" data-read-remote="${escapeHTML(r.id)}">원고 전문 읽기</button></article>`).join('')||'<p>연결된 완료 원고가 없습니다.</p>'}${t.kind!=='dawn'&&records.length<2?'<p class="sub">확인된 완료본만 표시합니다. 직전 원고를 확인하면 함께 표시됩니다.</p>':''}<div class="actions">${saved?`<button type="button" class="soft-button" data-open-inbox="${t.id}">기기 저장본</button>`:''}<button type="button" class="soft-button" data-import="${t.id}">직접 가져오기</button></div></section>`;
     }).join('');
+    renderFeedStatus();
   }
   function go(screen){
     if(screen==='editor'&&!active())newProject('sunday');
@@ -136,10 +144,10 @@
     const finalDate=date?`${date[1]}-${date[2].padStart(2,'0')}-${date[3].padStart(2,'0')}`:localToday();
     return {title:(title||task.latest).slice(0,200),passage,date:finalDate};
   }
-  function saveImported(){
+  function saveImported(source=null){
     const content=el('#extraText').value.trim();if(!content){toast('원고를 먼저 입력해 주세요.');return;}
     if(content.length>600000){toast('원고가 너무 깁니다. 60만 자 이하로 나누어 가져오세요.');return;}
-    const task=getTask(currentTaskId),parsed=detectMeta(content,task);
+    const task=getTask(currentTaskId),parsed=source?.manuscriptId?{title:source.title,passage:source.passage,date:source.date||''}:detectMeta(content,task);
     inbox[task.id]={content,title:parsed.title,savedAt:new Date().toISOString(),passage:parsed.passage};
     saveInbox();
     const p=normalizeProject({id:uuid(),kind:task.kind,date:parsed.date,title:parsed.title,passage:parsed.passage,draftText:content,
@@ -168,7 +176,7 @@
     el('#extraFile').value='';
   }
   function exportAll(){
-    const payload={format:'noan-sermon-studio',version:3,exportedAt:new Date().toISOString(),projects:state.projects,inbox};
+    const payload={format:'noan-sermon-studio',version:3,exportedAt:new Date().toISOString(),projects:state.projects,inbox,remoteFeed:{schema:1,updatedAt:feedUpdatedAt,items:Object.values(remote).flat()}};
     download('노안설교연구실_독립앱_전체백업_'+localToday()+'.json',JSON.stringify(payload,null,2),'application/json;charset=utf-8');
     toast('설교 카드와 예약 원고함을 함께 백업했습니다.');
   }
@@ -222,10 +230,11 @@
         }).catch(()=>{});
       });
     }
-    window.addEventListener('online',()=>{toast('인터넷 연결이 복구되었습니다.');checkVersion();});
+    window.addEventListener('online',()=>{toast('인터넷 연결이 복구되었습니다.');checkVersion();refreshRemoteFeed();});
     window.addEventListener('offline',()=>toast('오프라인 상태입니다. 저장한 원고는 계속 작성할 수 있습니다.'));
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkVersion();});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){checkVersion();refreshRemoteFeed();}});
     setInterval(checkVersion,60*60*1000);
+    setInterval(()=>{if(document.visibilityState==='visible')refreshRemoteFeed();},5*60*1000);
     checkVersion();
   }
   function attachExtra(){
@@ -246,10 +255,10 @@
     el('#readerClose').addEventListener('click',closeReader);
     el('#readerDialog').addEventListener('click',e=>{if(e.target===el('#readerDialog'))closeReader();});
     el('#readerSave').addEventListener('click',saveRemoteToCard);
-    el('#readerCopy').addEventListener('click',()=>{const r=getRemoteResult(readingTaskId);if(r)copyText(r.content);});
+    el('#readerCopy').addEventListener('click',()=>{const r=readingRecord;if(r)copyText(r.content);});
     el('#feedRefresh').addEventListener('click',()=>refreshRemoteFeed(true));
     el('#extraDialog').addEventListener('click',e=>{if(e.target===el('#extraDialog'))closeDialog();});
-    el('#extraSave').addEventListener('click',saveImported);
+    el('#extraSave').addEventListener('click',()=>saveImported());
     el('#extraFileButton').addEventListener('click',()=>el('#extraFile').click());
     el('#extraFile').addEventListener('change',e=>readPlainFile(e.target.files?.[0]));
     el('#reloadApp').addEventListener('click',refresh);
@@ -263,3 +272,4 @@
   loadInbox();loadRemoteCache();attachExtra();registerOffline();go('home');refreshRemoteFeed();
   window.__noanStudio={version:APP_VERSION,go,renderHome,renderInbox,checkVersion,refreshRemoteFeed};
 })();
+
