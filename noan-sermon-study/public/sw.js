@@ -1,5 +1,5 @@
-const CACHE = 'noan-sermon-v2.2-20261119';
-const CORE = ['/', '/index.html', '/app.js', '/feed.js', '/app.css', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'noan-sermon-v2.3-plus-20261119';
+const CORE = ['/', '/index.html', '/app.js', '/feed.js', '/plus.js', '/app.css', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)));
   self.skipWaiting();
@@ -11,6 +11,7 @@ self.addEventListener('fetch', event => {
   if(event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if(url.origin !== self.location.origin) return;
+  if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/auth/')) { event.respondWith(fetch(event.request)); return; }
   if(url.pathname === '/version.json') { event.respondWith(fetch(event.request)); return; }
   event.respondWith(fetch(event.request).catch(()=>caches.match(event.request).then(hit=>hit||caches.match('/index.html'))));
 });

@@ -2,6 +2,33 @@
   "name": "black-feather-52eb",
   "compatibility_date": "2026-11-18",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/gpt/*",
+      "/auth/openai/*"
+    ]
+  },
+  "main": "src/worker.mjs",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PLUS_SESSIONS",
+        "class_name": "PlusSessions"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "plus-session-v1",
+      "new_sqlite_classes": [
+        "PlusSessions"
+      ]
+    }
+  ],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://black-feather-52eb.noan-central-3354fde.workers.dev",
+    "PLUS_HOSTED_APPROVED": "false",
+    "PLUS_INCLUDED_ONLY_VERIFIED": "false"
   }
 }
